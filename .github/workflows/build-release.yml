@@ -3,6 +3,7 @@ name: Build GTA-2.11 Release APK
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -29,6 +30,25 @@ jobs:
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
+
+      - name: Fix case-sensitive includes
+        run: |
+          cd app/src/main/cpp/samp
+          find . \( -name "*.cpp" -o -name "*.h" \) | while read f; do
+            grep -oP '#include\s*"\K[^"]+' "$f" 2>/dev/null | while read inc; do
+              dir=$(dirname "$f")
+              if [ ! -f "$dir/$inc" ]; then
+                real=$(find "$dir" -maxdepth 3 -iname "$(basename "$inc")" 2>/dev/null | head -1)
+                if [ -n "$real" ]; then
+                  real_basename=$(basename "$real")
+                  if [ "$real_basename" != "$(basename "$inc")" ]; then
+                    echo "Fixing: $f: '$inc' -> '$real_basename'"
+                    sed -i "s|#include \"$inc\"|#include \"$real_basename\"|g" "$f"
+                  fi
+                fi
+              fi
+            done
+          done
 
       - name: Build Release APK
         run: ./gradlew assembleRelease --no-daemon --stacktrace
