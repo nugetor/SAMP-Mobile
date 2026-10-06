@@ -1,0 +1,59 @@
+name: Build GTA-2.11 Release APK
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      # Проект использует NDK 26.2.11394342 и CMake
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26d
+          link-to-sdk: true
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Setup Google Services JSON
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            echo "$GOOGLE_SERVICES_JSON" > app/google-services.json
+          elif [ ! -f "app/google-services.json" ]; then
+            echo '{"project_info":{"project_number":"","firebase_url":"","project_id":"","storage_bucket":""},"client":[],"configuration_version":"1"}' > app/google-services.json
+          fi
+
+      # Сборка Release APK
+      # В build.gradle.kts имя файла переопределено как GTA-2.11-release.apk
+      - name: Build Release APK
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Upload APK to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: GTA-2.11-Release-APK
+          path: app/build/outputs/apk/release/GTA-2.11-release.apk
+          retention-days: 90
+
+      - name: Attach APK to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/outputs/apk/release/GTA-2.11-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
