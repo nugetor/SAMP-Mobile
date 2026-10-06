@@ -25,6 +25,26 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            val keystoreBase64 = System.getenv("KEYSTORE_BASE64")
+            if (keystoreBase64 != null) {
+                val keystoreFile = file("${layout.buildDirectory.get()}/ci-release.keystore")
+                keystoreFile.parentFile.mkdirs()
+                keystoreFile.writeBytes(java.util.Base64.getDecoder().decode(keystoreBase64))
+                storeFile = keystoreFile
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "android"
+                keyAlias = System.getenv("KEY_ALIAS") ?: "sampmobile"
+                keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
+            } else {
+                storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
+    }
+
     packaging {
         jniLibs {
             excludes.add("META-INF/*")
@@ -65,6 +85,8 @@ android {
             }
         }
         release {
+            signingConfig = signingConfigs.getByName("release")
+
             firebaseCrashlytics {
                 nativeSymbolUploadEnabled = true
                 strippedNativeLibsDir = "build/intermediates/stripped_native_libs/release/out/lib"
@@ -115,7 +137,6 @@ dependencies {
     implementation("com.android.volley:volley:1.2.1")
     implementation("com.intuit.sdp:sdp-android:1.1.0")
     implementation("com.google.firebase:firebase-analytics")
-    //implementation("com.google.firebase:firebase-crashlytics-ndk")
     implementation(platform("com.google.firebase:firebase-bom:34.13.0"))
     implementation("com.google.firebase:firebase-messaging")
     implementation("com.google.firebase:firebase-config")
