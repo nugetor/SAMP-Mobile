@@ -6,6 +6,7 @@
 #define MATERIAL_TYPE_MATERIAL	1
 #define MATERIAL_TYPE_TEXT		2
 
+class CVehicle;
 class CObject
 {
 public:
