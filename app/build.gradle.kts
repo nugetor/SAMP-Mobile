@@ -26,19 +26,11 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            val ciKeystorePath = System.getenv("CI_KEYSTORE_PATH")
-            if (ciKeystorePath != null && file(ciKeystorePath).exists()) {
-                storeFile = file(ciKeystorePath)
-                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "android"
-                keyAlias = System.getenv("KEY_ALIAS") ?: "sampmobile"
-                keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
-            } else {
-                storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
-                storePassword = "android"
-                keyAlias = "androiddebugkey"
-                keyPassword = "android"
-            }
+        create("ciRelease") {
+            storeFile = file("${layout.buildDirectory.get()}/ci-release.keystore")
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
+            keyAlias = System.getenv("KEY_ALIAS") ?: ""
+            keyPassword = System.getenv("KEY_PASSWORD") ?: ""
         }
     }
 
@@ -82,7 +74,12 @@ android {
             }
         }
         release {
-            signingConfig = signingConfigs.getByName("release")
+            val keystoreBase64 = System.getenv("KEYSTORE_BASE64")
+            if (keystoreBase64 != null && keystoreBase64.isNotEmpty()) {
+                signingConfig = signingConfigs.getByName("ciRelease")
+            } else {
+                signingConfig = signingConfigs.getByName("debug")
+            }
 
             firebaseCrashlytics {
                 nativeSymbolUploadEnabled = true
@@ -116,6 +113,20 @@ android {
 
     buildFeatures {
         prefab = true
+    }
+}
+
+// Декодируем keystore из base64 ПЕРЕД валидацией подписи
+tasks.named("validateSigningRelease").configure {
+    doFirst {
+        val keystoreBase64 = System.getenv("KEYSTORE_BASE64")
+        if (keystoreBase64 != null && keystoreBase64.isNotEmpty()) {
+            val keystoreFile = file("${layout.buildDirectory.get()}/ci-release.keystore")
+            keystoreFile.parentFile.mkdirs()
+            val decoded = java.util.Base64.getMimeDecoder().decode(keystoreBase64)
+            keystoreFile.writeBytes(decoded)
+            println("Keystore decoded to ${keystoreFile.absolutePath} (${decoded.size} bytes)")
+        }
     }
 }
 
