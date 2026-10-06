@@ -116,16 +116,23 @@ android {
     }
 }
 
-// Декодируем keystore из base64 ПЕРЕД валидацией подписи
+// Декодируем keystore через shell-команду перед валидацией
 tasks.named("validateSigningRelease").configure {
     doFirst {
         val keystoreBase64 = System.getenv("KEYSTORE_BASE64")
         if (keystoreBase64 != null && keystoreBase64.isNotEmpty()) {
             val keystoreFile = file("${layout.buildDirectory.get()}/ci-release.keystore")
             keystoreFile.parentFile.mkdirs()
-            val decoded = java.util.Base64.getMimeDecoder().decode(keystoreBase64)
-            keystoreFile.writeBytes(decoded)
-            println("Keystore decoded to ${keystoreFile.absolutePath} (${decoded.size} bytes)")
+            
+            exec {
+                commandLine("bash", "-c", "echo '$keystoreBase64' | base64 --decode > '${keystoreFile.absolutePath}'")
+            }
+            
+            if (keystoreFile.exists() && keystoreFile.length() > 0) {
+                println("Keystore decoded to ${keystoreFile.absolutePath} (${keystoreFile.length()} bytes)")
+            } else {
+                throw GradleException("Failed to decode keystore")
+            }
         }
     }
 }
