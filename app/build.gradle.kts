@@ -116,23 +116,35 @@ android {
     }
 }
 
-// Декодируем keystore через shell-команду перед валидацией
-tasks.named("validateSigningRelease").configure {
-    doFirst {
+afterEvaluate {
+    tasks.findByName("validateSigningRelease")?.doFirst {
         val keystoreBase64 = System.getenv("KEYSTORE_BASE64")
         if (keystoreBase64 != null && keystoreBase64.isNotEmpty()) {
-            val keystoreFile = file("${layout.buildDirectory.get()}/ci-release.keystore")
-            keystoreFile.parentFile.mkdirs()
-            
-            exec {
-                commandLine("bash", "-c", "echo '$keystoreBase64' | base64 --decode > '${keystoreFile.absolutePath}'")
+            val buildDir = layout.buildDirectory.get().asFile
+            val keystoreFile = file("${buildDir.absolutePath}/ci-release.keystore")
+            val b64File = file("${buildDir.absolutePath}/ci-release.b64")
+
+            buildDir.mkdirs()
+
+            b64File.writeText(keystoreBase64)
+
+            val process = ProcessBuilder(
+                "bash", "-c",
+                "base64 --decode '${b64File.absolutePath}' > '${keystoreFile.absolutePath}'"
+            )
+                .redirectErrorStream(true)
+                .start()
+
+            val output = process.inputStream.readBytes().decodeToString()
+            val exitCode = process.waitFor()
+
+            b64File.delete()
+
+            if (exitCode != 0 || !keystoreFile.exists() || keystoreFile.length() == 0L) {
+                throw GradleException("Failed to decode keystore (exit=$exitCode): $output")
             }
-            
-            if (keystoreFile.exists() && keystoreFile.length() > 0) {
-                println("Keystore decoded to ${keystoreFile.absolutePath} (${keystoreFile.length()} bytes)")
-            } else {
-                throw GradleException("Failed to decode keystore")
-            }
+
+            println("Keystore decoded: ${keystoreFile.absolutePath} (${keystoreFile.length()} bytes)")
         }
     }
 }
