@@ -27,12 +27,9 @@ android {
 
     signingConfigs {
         create("release") {
-            val keystoreBase64 = System.getenv("KEYSTORE_BASE64")
-            if (keystoreBase64 != null) {
-                val keystoreFile = file("${layout.buildDirectory.get()}/ci-release.keystore")
-                keystoreFile.parentFile.mkdirs()
-                keystoreFile.writeBytes(java.util.Base64.getDecoder().decode(keystoreBase64))
-                storeFile = keystoreFile
+            val ciKeystorePath = System.getenv("CI_KEYSTORE_PATH")
+            if (ciKeystorePath != null && file(ciKeystorePath).exists()) {
+                storeFile = file(ciKeystorePath)
                 storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "android"
                 keyAlias = System.getenv("KEY_ALIAS") ?: "sampmobile"
                 keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
